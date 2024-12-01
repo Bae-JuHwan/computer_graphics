@@ -20,12 +20,20 @@ GLuint vertexShader;
 GLuint fragmentShader;
 Model modelCube, modelPyramid, modelLightCube;
 
+GLfloat lightAngle = 0.0f;
+GLfloat lightZmove = 3.0f;
+
 bool drawCube = false;
 bool cullingEnabled = false;
 bool wireframeMode = false;
 GLfloat yRotationAngle = 0.0f;
 bool rotatePositiveY = false;
 bool rotateNegativeY = false;
+bool isLightOn = false; 
+bool orbitPositiveY = false;
+bool orbitNegativeY = false;
+bool isLightZmove = false;
+bool isLightZmoveReverse = false;
 
 char* filetobuf(const char* file) {
     FILE* fptr;
@@ -355,16 +363,6 @@ GLvoid drawScene() {
 
     unsigned int modelLocation = glGetUniformLocation(shaderProgramID, "model");
 
-    glm::vec3 lightPos = glm::vec3(baseModelMatrix * glm::vec4(0.0f, 0.0f, 3.0f, 1.0f));    // 조명 위치
-    glm::vec3 lightColor(1.0f, 1.0f, 1.0f);  // 조명 색상 (흰색)
-    glm::vec3 viewPos(0.0f, 0.0f, 10.0f);    // 카메라 위치
-
-    GLuint lightColorLoc = glGetUniformLocation(shaderProgramID, "lightColor");
-    GLuint viewPosLoc = glGetUniformLocation(shaderProgramID, "viewPos");
-
-    glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
-    glUniform3fv(viewPosLoc, 1, glm::value_ptr(viewPos));
-
     // 정육면체 렌더링
     if (drawCube) {
         glUniformMatrix4fv(glGetUniformLocation(shaderProgramID, "model"), 1, GL_FALSE, glm::value_ptr(cubeModelMatrix));
@@ -379,6 +377,18 @@ GLvoid drawScene() {
         glDrawElements(GL_TRIANGLES, modelPyramid.faces.size() * 3, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
     }
+
+    // 조명 공전 변환
+    glm::mat4 orbitTransform = glm::rotate(glm::mat4(1.0f), glm::radians(lightAngle), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::vec3 lightPos = glm::vec3(orbitTransform * glm::vec4(0.0f, 0.0f, lightZmove, 1.0f)); // 공전 위치
+    glm::vec3 lightColor = isLightOn ? glm::vec3(1.0f, 1.0f, 1.0f) : glm::vec3(0.0f, 0.0f, 0.0f);  // 조명 색상 (흰색)
+    glm::vec3 viewPos(0.0f, 0.0f, 10.0f);    // 카메라 위치
+
+    GLuint lightColorLoc = glGetUniformLocation(shaderProgramID, "lightColor");
+    GLuint viewPosLoc = glGetUniformLocation(shaderProgramID, "viewPos");
+
+    glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
+    glUniform3fv(viewPosLoc, 1, glm::value_ptr(viewPos));
 
     // 최종 조명 위치를 유니폼에 전달
     GLuint lightPosLoc = glGetUniformLocation(shaderProgramID, "lightPos");
@@ -442,6 +452,23 @@ GLvoid Keyboard(unsigned char key, int x, int y) {
         rotatePositiveY = false;
         rotateNegativeY = false;
         break;
+    case 'm':
+        isLightOn = !isLightOn;
+        break;
+    case 'r':
+        orbitPositiveY = !orbitPositiveY;
+        orbitNegativeY = false;
+        break;
+    case 'R':
+        orbitNegativeY = !orbitNegativeY;
+        orbitPositiveY = false;
+        break;
+    case 'z':
+        isLightZmove = !isLightZmove;
+        break;
+    case 'Z':
+        isLightZmoveReverse = !isLightZmoveReverse;
+        break;
     }
     glutPostRedisplay();
 }
@@ -453,8 +480,24 @@ GLvoid Timer(int value) {
     if (rotateNegativeY) {
         yRotationAngle -= 1.0f;
     }
+    if (orbitPositiveY) {
+        lightAngle += 1.0f;
+    }
+    if (orbitNegativeY) {
+        lightAngle -= 1.0f;
+    }
     if (yRotationAngle > 360.0f) yRotationAngle -= 360.0f;
     if (yRotationAngle < 360.0f) yRotationAngle += 360.0f;
+
+    if (lightAngle > 360.0f) lightAngle -= 360.0f;
+    if (lightAngle < 0.0f) lightAngle += 360.0f;
+
+    if (isLightZmove) {
+        lightZmove += 0.01f;
+    }
+    if (isLightZmoveReverse) {
+        lightZmove -= 0.01f;
+    }
 
     glutPostRedisplay();
 
