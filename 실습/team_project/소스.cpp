@@ -62,7 +62,7 @@ char* filetobuf(const char* file) {
     buf[length] = 0;
     return buf;
 }
-//Бъ
+
 void make_vertexShaders();
 void make_fragmentShaders();
 void InitBuffer();
