@@ -41,5 +41,5 @@ void main()
 
     // 최종 색상 계산 (정점 색상 곱하기)
     vec3 result = (ambient + diffuse + specular) * vColor;
-    FragColor = vec4(result, 1.0);
+    FragColor = vec4(result, 0.5);
 }

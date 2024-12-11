@@ -14,16 +14,17 @@
 #include <gl/glm/gtc/matrix_transform.hpp>
 #include "헤더.h"
 
-GLuint vaoBottom, vaoPyramid, vaoLightCube, vaoEarth, vaoVenus, vaoMercury, vaoSnow;
-GLuint vboBottom[2], vboPyramid[2], vboLightCube[2], vboEarth[2], vboVenus[2], vboMercury[2], vboSnow[2];
+GLuint vaoBottom, vaoPyramid, vaoLightCube, vaoEarth, vaoVenus, vaoMercury, vaoSnow, vaoLongCube;
+GLuint vboBottom[2], vboPyramid[2], vboLightCube[2], vboEarth[2], vboVenus[2], vboMercury[2], vboSnow[2], vboLongCube[2];
 GLuint shaderProgramID;
 GLuint vertexShader;
 GLuint fragmentShader;
-Model modelBottom, modelPyramid, modelLightCube, modelEarth, modelVenus, modelMercury, modelSnow;
+Model modelBottom, modelPyramid, modelLightCube, modelEarth, modelVenus, modelMercury, modelSnow, modelLongCube;
 
 GLfloat lightAngle = 0.0f;      // 조명 공전
 GLfloat lightZmove = 3.0f;      // 조명 z축 이동
 GLfloat planetOrbit = 0.0f;
+GLfloat cameraYrevolve = 0.0f;
 float lightIntensity = 1.0f;
 int sierpinskiDepth = 0;
 
@@ -34,6 +35,7 @@ bool isLightZmoveReverse = false;   // 조명 z축 이동
 bool isSnowFalling = false;
 bool isLightOn = false;
 bool isLightPositionChange = false;
+bool isCameraYrevolve = false;
 
 // 눈 입자 정보를 저장할 구조체 정의
 struct Snowflake {
@@ -78,6 +80,7 @@ void InitEarth();
 void InitVenus();
 void InitMercury();
 void InitSnow();
+void InitLongCube();
 GLuint make_shaderProgram();
 GLvoid drawScene();
 GLvoid Reshape(int w, int h);
@@ -127,7 +130,7 @@ void InitBuffer(GLuint& vao, GLuint* vbo, const std::vector<Vertex>& vertices, c
     glEnableVertexAttribArray(1);
 
     // 색상
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
     glEnableVertexAttribArray(2);
 
     glBindVertexArray(0);  // VAO 바인드 해제
@@ -436,6 +439,46 @@ void InitSnowflakes() {
     }
 }
 
+void InitLongCube() {
+    read_obj_file("longCube.obj", modelLongCube); // pyramid.obj 읽기
+
+    std::vector<Vertex> expandedVertices;
+    std::vector<unsigned int> indices;
+
+    glm::vec3 color = glm::vec3(0.6f, 0.1f, 1.0f);
+
+    for (size_t i = 0; i < modelLongCube.faces.size(); ++i) {
+        Vertex v1 = modelLongCube.vertices[modelLongCube.faces[i].v1];
+        Vertex v2 = modelLongCube.vertices[modelLongCube.faces[i].v2];
+        Vertex v3 = modelLongCube.vertices[modelLongCube.faces[i].v3];
+
+        // 각 정점에 색상 추가
+        v1.color = color;
+        v2.color = color;
+        v3.color = color;
+
+        // 삼각형의 법선 계산
+        glm::vec3 edge1 = glm::vec3(v2.x - v1.x, v2.y - v1.y, v2.z - v1.z);
+        glm::vec3 edge2 = glm::vec3(v3.x - v1.x, v3.y - v1.y, v3.z - v1.z);
+        glm::vec3 normal = glm::normalize(glm::cross(edge1, edge2));
+
+        // 정점에 법선 추가
+        v1.normal = normal;
+        v2.normal = normal;
+        v3.normal = normal;
+
+        expandedVertices.push_back(v1);
+        expandedVertices.push_back(v2);
+        expandedVertices.push_back(v3);
+
+        indices.push_back(expandedVertices.size() - 3);
+        indices.push_back(expandedVertices.size() - 2);
+        indices.push_back(expandedVertices.size() - 1);
+    }
+
+    InitBuffer(vaoLongCube, vboLongCube, expandedVertices, indices); // InitBuffer 호출
+}
+
 // 눈 입자의 위치 업데이트
 void UpdateSnowflakes() {
     if (!isSnowFalling) return;
@@ -510,6 +553,43 @@ void drawPyramidWithSierpinski(int depth) {
     drawSierpinskiTriangle(apex, base4, base2, depth);
 }
 
+void renderMultipleCubes(GLint modelLocation, GLuint vaoLongCube, int faceCount) {
+    // 정육면체의 위치와 크기를 배열로 정의
+    glm::vec3 positions[5] = {
+        glm::vec3(2.0f, 0.75f, 0.0f),
+        glm::vec3(-2.0f, 0.75f, 1.0f),
+        glm::vec3(1.5f, 0.75f, -1.2f),
+        glm::vec3(-1.8f, 0.75f, 2.4f),
+        glm::vec3(1.7f, 0.75f, 0.5f)
+    };
+
+    glm::vec3 scaleFactors[5] = {
+        glm::vec3(0.5f, 0.5f, 0.5f),
+        glm::vec3(0.5f, 0.5f, 0.5f),
+        glm::vec3(0.5f, 0.5f, 0.5f),
+        glm::vec3(0.5f, 0.5f, 0.5f),
+        glm::vec3(0.5f, 0.5f, 0.5f)
+    };
+
+    // 5개의 정육면체 렌더링
+    for (int i = 0; i < 5; ++i) {
+        glm::mat4 modelMatrix = glm::mat4(1.0f);
+        modelMatrix = glm::translate(modelMatrix, positions[i]); // 위치
+        modelMatrix = glm::scale(modelMatrix, scaleFactors[i]);  // 크기
+
+        glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        glBindVertexArray(vaoLongCube);
+        glDrawElements(GL_TRIANGLES, faceCount * 3, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+
+        glDisable(GL_BLEND);
+    }
+}
+
 void main(int argc, char** argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
@@ -529,6 +609,7 @@ void main(int argc, char** argv) {
     InitMercury();
     InitSnow();
     InitSnowflakes();
+    InitLongCube();
 
     glutDisplayFunc(drawScene);
     glutReshapeFunc(Reshape);
@@ -601,10 +682,20 @@ GLvoid drawScene() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(shaderProgramID);
 
-    // 뷰 변환
+    // 공전 각도 계산
+    float revolveAngle = glm::radians(cameraYrevolve);
+    glm::mat4 revolveMatrix = glm::rotate(glm::mat4(1.0f), revolveAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::vec3 initialCameraPos(0.0f, 5.0f, 10.0f);
+    glm::vec3 finalCameraPos = glm::vec3(revolveMatrix * glm::vec4(initialCameraPos, 1.0f));
+
+    // 카메라가 보는 지점을 회전
+    glm::vec3 target = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 direction = target - finalCameraPos;
+
+    // 뷰 행렬 생성
     glm::mat4 viewMatrix = glm::lookAt(
-        glm::vec3(0.0f, 5.0f, 10.0f),  // 카메라 위치
-        glm::vec3(0.0f, 0.0f, 0.0f),   // 카메라가 바라보는 지점
+        finalCameraPos,  // 카메라 위치
+        target,   // 회전된 시점 (카메라가 바라보는 지점)
         glm::vec3(0.0f, 1.0f, 0.0f)  // 위쪽 방향
     );
 
@@ -664,6 +755,8 @@ GLvoid drawScene() {
     glBindVertexArray(vaoMercury);
     glDrawElements(GL_TRIANGLES, modelMercury.faces.size() * 3, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
+
+    renderMultipleCubes(modelLocation, vaoLongCube, modelLongCube.faces.size());
 
     // 눈 렌더링
     DrawSnowflakes();
@@ -743,6 +836,9 @@ GLvoid Keyboard(unsigned char key, int x, int y) {
         if (lightIntensity < 0.0f)
             lightIntensity = 0.0f;
         break;
+    case 'y':
+        isCameraYrevolve = !isCameraYrevolve;
+        break;
     case 's':
         isSnowFalling = !isSnowFalling;
         break;
@@ -785,6 +881,10 @@ GLvoid Timer(int value) {
     }
     if (isLightZmoveReverse) {
         lightZmove -= 0.01f;
+    }
+
+    if (isCameraYrevolve) {
+        cameraYrevolve += 1.5f;
     }
 
     planetOrbit += 1.0f;
