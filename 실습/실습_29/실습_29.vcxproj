@@ -134,6 +134,8 @@
     <ClCompile Include="소스.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="background_fragment.glsl" />
+    <None Include="background_vertex.glsl" />
     <None Include="fragment.glsl" />
     <None Include="vertex.glsl" />
   </ItemGroup>

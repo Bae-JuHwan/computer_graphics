@@ -18,6 +18,7 @@
 GLuint vaoAxis, vaoCube, vaoPyramid;
 GLuint vboAxis, vboCube[2], vboPyramid[2];
 GLuint shaderProgramID;
+GLuint backgroundShaderProgram;
 GLuint vertexShader;
 GLuint fragmentShader;
 GLuint vao[2], vbo[2];
@@ -66,6 +67,8 @@ GLvoid Timer(int value);
 
 int window_Width = 800;
 int window_Height = 600;
+
+unsigned int backgroundVAO, backgroundVBO, backgroundEBO, backgroundTexture;
 
 float vertexData[] = {
     // Front face
@@ -147,6 +150,19 @@ float vertexData2[] = {
     -0.5f, -0.5f, -0.5f,   0.0f, 1.0f, 1.0f,   0.0f, 0.0f // Bottom-left
 };
 
+float backgroundVertices[] = {
+    // Positions       // Texture Coords
+    -1.0f, -1.0f, 0.0f,  0.0f, 0.0f, // Bottom-left
+     1.0f, -1.0f, 0.0f,  1.0f, 0.0f, // Bottom-right
+     1.0f,  1.0f, 0.0f,  1.0f, 1.0f, // Top-right
+    -1.0f,  1.0f, 0.0f,  0.0f, 1.0f  // Top-left
+};
+
+unsigned int backgroundIndices[] = {
+    0, 1, 2, // First triangle
+    0, 2, 3  // Second triangle
+};
+
 void InitBuffer() {
     glGenVertexArrays(2, vao);
     glGenBuffers(2, vbo);
@@ -172,6 +188,30 @@ void InitBuffer() {
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
     glEnableVertexAttribArray(2);
+}
+
+void InitBackgroundBuffer() {
+    glGenVertexArrays(1, &backgroundVAO);
+    glGenBuffers(1, &backgroundVBO);
+    glGenBuffers(1, &backgroundEBO);
+
+    glBindVertexArray(backgroundVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, backgroundVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(backgroundVertices), backgroundVertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, backgroundEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(backgroundIndices), backgroundIndices, GL_STATIC_DRAW);
+
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Texture coordinate attribute
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
 }
 
 void InitTexture() {
@@ -202,99 +242,53 @@ void InitTexture() {
     }
 }
 
-//void InitCube() {
-//    read_obj_file("cube.obj", modelCube); // OBJ 파일 읽기
-//
-//    std::vector<Vertex> expandedVertices;
-//    std::vector<unsigned int> indices;
-//
-//    for (size_t i = 0; i < modelCube.faces.size(); ++i) {
-//        Vertex v1 = modelCube.vertices[modelCube.faces[i].v1];
-//        Vertex v2 = modelCube.vertices[modelCube.faces[i].v2];
-//        Vertex v3 = modelCube.vertices[modelCube.faces[i].v3];
-//
-//        int faceIndex = i / 2; // 면 번호 (0 ~ 5)
-//
-//        // 텍스처 좌표 설정
-//        if (i % 2 == 0) { // 첫 번째 삼각형
-//            v1.texCoord = glm::vec2(0.0f, 0.0f);
-//            v2.texCoord = glm::vec2(1.0f, 0.0f);
-//            v3.texCoord = glm::vec2(1.0f, 1.0f);
-//        }
-//        else { // 두 번째 삼각형
-//            v1.texCoord = glm::vec2(0.0f, 0.0f);
-//            v2.texCoord = glm::vec2(1.0f, 1.0f);
-//            v3.texCoord = glm::vec2(0.0f, 1.0f);
-//        }
-//
-//        expandedVertices.push_back(v1);
-//        expandedVertices.push_back(v2);
-//        expandedVertices.push_back(v3);
-//
-//        indices.push_back(expandedVertices.size() - 3);
-//        indices.push_back(expandedVertices.size() - 2);
-//        indices.push_back(expandedVertices.size() - 1);
-//    }
-//
-//    InitBuffer(vaoCube, vboCube, expandedVertices, indices); // InitBuffer 호출
-//}
+void InitBackgroundTexture() {
+    glGenTextures(1, &backgroundTexture);
+    glBindTexture(GL_TEXTURE_2D, backgroundTexture);
 
-//void InitPyramid() {
-//    read_obj_file("pyramid.obj", modelPyramid); // pyramid.obj 읽기
-//
-//    std::vector<Vertex> expandedVertices;
-//    std::vector<unsigned int> indices;
-//
-//    for (size_t i = 0; i < modelPyramid.faces.size(); ++i) {
-//        Vertex v1 = modelPyramid.vertices[modelPyramid.faces[i].v1];
-//        Vertex v2 = modelPyramid.vertices[modelPyramid.faces[i].v2];
-//        Vertex v3 = modelPyramid.vertices[modelPyramid.faces[i].v3];
-//
-//        if (i == 0) { // 첫 번째 면에만 텍스처 적용
-//            v1.texCoord = glm::vec2(0.0f, 0.0f);
-//            v2.texCoord = glm::vec2(1.0f, 0.0f);
-//            v3.texCoord = glm::vec2(0.5f, 1.0f);
-//        }
-//        else if (i == 1) { // 첫 번째 면에만 텍스처 적용
-//            v1.texCoord = glm::vec2(0.0f, 0.0f);
-//            v2.texCoord = glm::vec2(1.0f, 0.0f);
-//            v3.texCoord = glm::vec2(0.5f, 1.0f);
-//        }
-//        else if (i == 2) { // 첫 번째 면에만 텍스처 적용
-//            v1.texCoord = glm::vec2(0.0f, 0.0f);
-//            v2.texCoord = glm::vec2(1.0f, 0.0f);
-//            v3.texCoord = glm::vec2(0.5f, 1.0f);
-//        }
-//        else if (i == 3) { // 첫 번째 면에만 텍스처 적용
-//            v1.texCoord = glm::vec2(0.0f, 0.0f);
-//            v2.texCoord = glm::vec2(1.0f, 0.0f);
-//            v3.texCoord = glm::vec2(0.5f, 1.0f);
-//        }
-//        else if (i == 4 || i == 5) {
-//            if (i == 4) {
-//                v1.texCoord = glm::vec2(0.0f, 0.0f);  // 첫 번째 삼각형
-//                v2.texCoord = glm::vec2(1.0f, 0.0f);
-//                v3.texCoord = glm::vec2(1.0f, 1.0f);
-//            }
-//            else if (i == 5) {
-//                v1.texCoord = glm::vec2(0.0f, 0.0f);  // 두 번째 삼각형
-//                v2.texCoord = glm::vec2(1.0f, 1.0f);
-//                v3.texCoord = glm::vec2(0.0f, 1.0f);
-//            }
-//        }
-//
-//        // 텍스처 좌표는 OBJ 파일에서 읽힌 값 사용
-//        expandedVertices.push_back(v1);
-//        expandedVertices.push_back(v2);
-//        expandedVertices.push_back(v3);
-//
-//        indices.push_back(expandedVertices.size() - 3);
-//        indices.push_back(expandedVertices.size() - 2);
-//        indices.push_back(expandedVertices.size() - 1);
-//    }
-//
-//    InitBuffer(vaoPyramid, vboPyramid, expandedVertices, indices); // InitBuffer 호출
-//}
+    // 텍스처 파라미터 설정
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // 텍스처 데이터 로드
+    int width, height, channels;
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char* data = stbi_load("sky.jpg", &width, &height, &channels, 0);
+    if (data) {
+        GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else {
+        std::cerr << "Failed to load background texture!" << std::endl;
+    }
+    stbi_image_free(data);
+}
+
+GLuint make_background_shaderProgram() {
+    GLchar* vertexSource = filetobuf("background_vertex.glsl");
+    GLchar* fragmentSource = filetobuf("background_fragment.glsl");
+
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexShader, 1, (const GLchar**)&vertexSource, 0);
+    glCompileShader(vertexShader);
+
+    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentShader, 1, (const GLchar**)&fragmentSource, 0);
+    glCompileShader(fragmentShader);
+
+    GLuint program = glCreateProgram();
+    glAttachShader(program, vertexShader);
+    glAttachShader(program, fragmentShader);
+    glLinkProgram(program);
+
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+
+    return program;
+}
 
 void main(int argc, char** argv) {
     glutInit(&argc, argv);
@@ -308,8 +302,11 @@ void main(int argc, char** argv) {
 
     make_shaderProgram();
     InitTexture();
+    InitBackgroundTexture();
     InitBuffer();
+    InitBackgroundBuffer();
 
+    backgroundShaderProgram = make_background_shaderProgram();
     glutDisplayFunc(drawScene);
     glutReshapeFunc(Reshape);
     glutKeyboardFunc(Keyboard);
@@ -387,11 +384,11 @@ GLvoid drawScene() {
         glm::vec3(0.0f, 0.0f, 0.0f),   // 카메라가 바라보는 지점
         glm::vec3(0.0f, 1.0f, 0.0f)    // 위쪽 방향
     );
-    glm::mat4 projectionMatrix = glm::perspective(
-        glm::radians(45.0f),
-        (float)window_Width / (float)window_Height,
-        0.1f,
-        100.0f
+
+    glm::mat4 projectionMatrix = glm::ortho(
+        -2.0f, 2.0f,  // X축 범위 (left, right)
+        -2.0f, 2.0f,  // Y축 범위 (bottom, top)
+        0.1f, 100.0f  // Z축 범위 (near, far)
     );
 
     GLint viewMatrixLocation = glGetUniformLocation(shaderProgramID, "view");
@@ -453,6 +450,17 @@ GLvoid drawScene() {
 
         glBindVertexArray(0); // VAO 바인딩 해제
     }
+
+    // 배경 렌더링
+    glUseProgram(backgroundShaderProgram); // 배경 셰이더 활성화
+    glBindVertexArray(backgroundVAO);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, backgroundTexture);
+    glUniform1i(glGetUniformLocation(backgroundShaderProgram, "backgroundTexture"), 0);
+
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
 
     glutSwapBuffers();    // 더블 버퍼링으로 화면 갱신
 }
